@@ -12,6 +12,10 @@ from ..models import (
     StoryState,
 )
 
+# Constants for chapter generation
+VOICE_CONTINUITY_WORDS = 2000  # Words from previous chapter to include for voice continuity
+SUMMARY_CONTENT_LIMIT = 10000  # Max characters of chapter content to summarize
+
 
 CHAPTER_SYSTEM_INSTRUCTION = """You are an acclaimed science fiction author known for vivid prose,
 compelling characters, and thought-provoking narratives. Your writing balances action,
@@ -257,17 +261,17 @@ Write the revised chapter now, with no preamble or explanation."""
 
         last_chapter = max(previous_chapters, key=lambda c: c.number)
 
-        # Include last 2000 words of previous chapter for voice continuity
+        # Include last N words of previous chapter for voice continuity
         words = last_chapter.content.split()
-        if len(words) > 2000:
-            excerpt = " ".join(words[-2000:])
+        if len(words) > VOICE_CONTINUITY_WORDS:
+            excerpt = " ".join(words[-VOICE_CONTINUITY_WORDS:])
             return f"=== END OF PREVIOUS CHAPTER (for voice continuity) ===\n...{excerpt}"
         else:
             return f"=== PREVIOUS CHAPTER (for voice continuity) ===\n{last_chapter.content}"
 
     def _generate_summary(self, content: str) -> str:
         """Generate a summary of the chapter content."""
-        prompt = CHAPTER_SUMMARY_PROMPT.format(chapter_content=content[:10000])
+        prompt = CHAPTER_SUMMARY_PROMPT.format(chapter_content=content[:SUMMARY_CONTENT_LIMIT])
 
         summary = self.client.generate(
             prompt,

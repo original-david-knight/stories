@@ -1,13 +1,15 @@
 """Abstract base class providing common reviewer functionality."""
 
-import json
-import re
 from abc import ABC, abstractmethod
 from typing import Optional
 
 from ..gemini_client import GeminiClient
 from ..models import ReviewIssue, Severity
+from ..utils import parse_json_response_safe
 from .base import Reviewer, ReviewContext, ReviewResult, ContentType
+
+# Constants
+MAX_ISSUE_LOCATION_LENGTH = 200  # Max characters for issue location text
 
 
 class AbstractReviewer(ABC):
@@ -62,7 +64,7 @@ class AbstractReviewer(ABC):
             temperature=0.3,
         )
 
-        review_data = self._parse_json_response(response)
+        review_data = parse_json_response_safe(response)
         issues = self._parse_issues(review_data.get("issues", []))
 
         passed = not any(i.severity == Severity.HIGH for i in issues)
@@ -104,42 +106,12 @@ class AbstractReviewer(ABC):
             issue = ReviewIssue(
                 category=issue_data.get("category", "general"),
                 severity=severity,
-                location=issue_data.get("location", "")[:200],
+                location=issue_data.get("location", "")[:MAX_ISSUE_LOCATION_LENGTH],
                 description=issue_data.get("description", ""),
                 suggestion=issue_data.get("suggestion", ""),
             )
             issues.append(issue)
         return issues
-
-    def _parse_json_response(self, response: str) -> dict:
-        """Parse JSON from response text."""
-        json_match = re.search(r"```(?:json)?\s*([\s\S]*?)```", response)
-        if json_match:
-            json_str = json_match.group(1).strip()
-        else:
-            json_str = response.strip()
-
-        start_idx = json_str.find("{")
-        if start_idx == -1:
-            return {"overall_quality": "unknown", "issues": [], "strengths": []}
-
-        depth = 0
-        end_idx = start_idx
-        for i, char in enumerate(json_str[start_idx:], start_idx):
-            if char == "{":
-                depth += 1
-            elif char == "}":
-                depth -= 1
-                if depth == 0:
-                    end_idx = i + 1
-                    break
-
-        json_str = json_str[start_idx:end_idx]
-
-        try:
-            return json.loads(json_str)
-        except json.JSONDecodeError:
-            return {"overall_quality": "unknown", "issues": [], "strengths": []}
 
     def _format_json_schema(self) -> str:
         """Get the common JSON response schema."""

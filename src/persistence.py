@@ -8,6 +8,9 @@ from typing import Optional
 from ebooklib import epub
 from pydantic import BaseModel, Field
 
+# Constants
+MIN_CHAPTER_CONTENT_LENGTH = 100  # Minimum chars to consider chapter content valid
+
 from .models import (
     AggregatedReview,
     Chapter,
@@ -142,8 +145,9 @@ class StoryPersistence:
                                 "total_chapters": len(state.concept.chapter_outlines),
                                 "updated_at": state.updated_at.isoformat(),
                             })
-                    except Exception:
-                        pass
+                    except (json.JSONDecodeError, ValueError, KeyError):
+                        # Skip corrupted story files - don't break listing
+                        continue
 
         return sorted(stories, key=lambda s: s["updated_at"], reverse=True)
 
@@ -266,7 +270,7 @@ class StoryPersistence:
 
         for i, chapter in enumerate(state.chapters):
             # If chapter has no content or very short content, try to load from file
-            if not chapter.content or len(chapter.content) < 100:
+            if not chapter.content or len(chapter.content) < MIN_CHAPTER_CONTENT_LENGTH:
                 meta_file = chapters_path / f"{chapter.number:02d}_meta.json"
                 if meta_file.exists():
                     with open(meta_file) as f:

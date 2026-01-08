@@ -58,7 +58,7 @@ The orchestrator coordinates the full workflow:
 1. Generates content via ConceptGenerator or ChapterGenerator
 2. Runs multi-reviewer validation (ReviewerRegistry dispatches to applicable reviewers)
 3. Revises content if any reviewer returns HIGH severity issues
-4. Repeats until all pass or max_revisions (default: 2) is reached
+4. Repeats until all pass or max_revisions (default: 7) is reached
 
 ## Interactive Story Creation Flow
 
@@ -151,7 +151,7 @@ Can also use `.env` file (loaded via python-dotenv).
 ## Key Patterns
 
 - All data models use Pydantic with `model_dump(mode="json")` for serialization
-- JSON responses from Gemini are parsed with regex extraction to handle markdown code blocks
+- JSON responses from Gemini are parsed via shared utilities in `src/utils.py` (handles markdown code blocks)
 - Chapter generation includes previous chapter summaries + last 2000 words for voice continuity
 - Temperature varies by task: 0.9 for concept generation, 0.85 for chapters, 0.3 for reviews/summaries
 - Reviewers implement the `Reviewer` Protocol and are managed via `ReviewerRegistry`

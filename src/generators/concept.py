@@ -1,16 +1,20 @@
 """Story concept and outline generation."""
 
-import json
-import re
 from typing import Optional
 
 from ..gemini_client import GeminiClient
+from ..utils import parse_json_response
 from ..models import (
     Character,
     ChapterOutline,
     StoryConcept,
     WorldDetails,
 )
+
+# Constants for limiting history items in prompts
+MAX_AVOID_NAMES = 30  # Max character names to include in avoidance list
+MAX_AVOID_TITLES = 20  # Max titles to include in avoidance list
+MAX_AVOID_LOGLINES = 5  # Max loglines to include for premise avoidance
 
 
 CONCEPT_SYSTEM_INSTRUCTION = """You are an expert science fiction author and story architect.
@@ -258,7 +262,7 @@ class ConceptGenerator:
         )
 
         # Parse JSON from response
-        concepts_data = self._parse_json_response(response)
+        concepts_data = parse_json_response(response)
 
         concepts = []
         for data in concepts_data:
@@ -301,7 +305,7 @@ class ConceptGenerator:
             temperature=0.7,  # Slightly lower for more coherent structure
         )
 
-        outline_data = self._parse_json_response(response)
+        outline_data = parse_json_response(response)
 
         # Handle both list and dict responses
         if isinstance(outline_data, list):
@@ -397,7 +401,7 @@ Provide the revised concept in JSON format:
             temperature=0.8,
         )
 
-        data = self._parse_json_response(response)
+        data = parse_json_response(response)
         if isinstance(data, list):
             data = data[0] if data else {}
 
@@ -452,7 +456,7 @@ Maintain the core appeal while fixing the identified issues."""
             temperature=0.7,
         )
 
-        data = self._parse_json_response(response)
+        data = parse_json_response(response)
         if isinstance(data, list):
             data = data[0] if data else {}
 
@@ -517,7 +521,7 @@ Keep what works, fix what doesn't. Maintain the target of {concept.target_chapte
             temperature=0.7,
         )
 
-        outline_data = self._parse_json_response(response)
+        outline_data = parse_json_response(response)
         if isinstance(outline_data, list):
             outline_data = outline_data[0] if outline_data else {}
 
@@ -587,7 +591,7 @@ Keep what works, fix what doesn't. Maintain the target of {concept.target_chapte
         avoid_section = ""
         if avoid_names:
             # Limit to most recent names to keep prompt reasonable
-            recent_names = avoid_names[-30:]
+            recent_names = avoid_names[-MAX_AVOID_NAMES:]
             avoid_section = (
                 f"\nIMPORTANT: Do NOT use these character names (they were used in previous stories): "
                 f"{', '.join(recent_names)}\n"
@@ -609,7 +613,7 @@ Keep what works, fix what doesn't. Maintain the target of {concept.target_chapte
             temperature=0.85,
         )
 
-        characters_data = self._parse_json_response(response)
+        characters_data = parse_json_response(response)
         if isinstance(characters_data, dict):
             characters_data = [characters_data]
 
@@ -691,7 +695,7 @@ Keep what works, fix what doesn't. Maintain the target of {concept.target_chapte
             temperature=temperature,
         )
 
-        char_data = self._parse_json_response(response)
+        char_data = parse_json_response(response)
         if isinstance(char_data, list):
             char_data = char_data[0] if char_data else {}
 
@@ -726,7 +730,7 @@ Keep what works, fix what doesn't. Maintain the target of {concept.target_chapte
 
         if avoid_titles:
             # Limit to most recent to keep prompt reasonable
-            recent_titles = avoid_titles[-20:]
+            recent_titles = avoid_titles[-MAX_AVOID_TITLES:]
             parts.append(
                 f"IMPORTANT: Do NOT use or closely resemble these previously used titles: "
                 f"{', '.join(recent_titles)}"
@@ -734,7 +738,7 @@ Keep what works, fix what doesn't. Maintain the target of {concept.target_chapte
 
         if avoid_loglines:
             # Just use a few recent loglines as examples of premises to avoid
-            recent_loglines = avoid_loglines[-5:]
+            recent_loglines = avoid_loglines[-MAX_AVOID_LOGLINES:]
             parts.append(
                 f"Create concepts with DIFFERENT premises from these recent stories:\n"
                 + "\n".join(f"- {ll}" for ll in recent_loglines)
@@ -790,54 +794,3 @@ Keep what works, fix what doesn't. Maintain the target of {concept.target_chapte
 
         return []
 
-    def _parse_json_response(self, response: str) -> dict | list:
-        """Parse JSON from a response that may contain markdown or extra text.
-
-        Args:
-            response: Raw response text from the model
-
-        Returns:
-            Parsed JSON data
-        """
-        # Try to extract JSON from markdown code blocks
-        json_match = re.search(r"```(?:json)?\s*([\s\S]*?)```", response)
-        if json_match:
-            json_str = json_match.group(1).strip()
-        else:
-            # Try to find raw JSON
-            json_str = response.strip()
-
-        # Find the start of JSON array or object
-        start_idx = min(
-            (json_str.find("[") if "[" in json_str else len(json_str)),
-            (json_str.find("{") if "{" in json_str else len(json_str)),
-        )
-        if start_idx < len(json_str):
-            json_str = json_str[start_idx:]
-
-        # Find the end (matching bracket)
-        if json_str.startswith("["):
-            end_char = "]"
-        elif json_str.startswith("{"):
-            end_char = "}"
-        else:
-            raise ValueError(f"Could not find JSON in response: {response[:200]}")
-
-        # Find matching end bracket
-        depth = 0
-        end_idx = 0
-        for i, char in enumerate(json_str):
-            if char in "[{":
-                depth += 1
-            elif char in "]}":
-                depth -= 1
-                if depth == 0:
-                    end_idx = i + 1
-                    break
-
-        json_str = json_str[:end_idx]
-
-        try:
-            return json.loads(json_str)
-        except json.JSONDecodeError as e:
-            raise ValueError(f"Failed to parse JSON: {e}\nResponse: {json_str[:500]}")
