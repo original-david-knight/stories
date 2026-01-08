@@ -44,7 +44,7 @@ Overall, this is a **well-structured codebase** with clear separation of concern
 
 ---
 
-## Issues Found
+## Issues Found (All Resolved)
 
 ### Critical Issues
 
@@ -52,23 +52,23 @@ None identified.
 
 ### High Priority
 
-#### 1. Duplicated JSON Parsing Logic
+#### 1. ~~Duplicated JSON Parsing Logic~~ ✅ RESOLVED
 **Location:** `src/generators/concept.py:793-843`, `src/reviewer.py:243-280`, `src/reviewers/abstract_reviewer.py:114-142`
 
 Three nearly identical implementations of `_parse_json_response()`. This violates DRY and increases maintenance burden.
 
-**Recommendation:** Extract to a shared utility function in a `utils.py` module.
+**Resolution:** Extracted to shared utility functions in `src/utils.py` (`parse_json_response` and `parse_json_response_safe`).
 
-#### 2. Legacy `reviewer.py` Appears Unused
+#### 2. ~~Legacy `reviewer.py` Appears Unused~~ ✅ RESOLVED
 **Location:** `src/reviewer.py`
 
 The `ChapterReviewer` class in `reviewer.py` appears to be legacy code that has been superseded by the multi-reviewer system in `src/reviewers/`. It's not imported anywhere in the orchestrator or CLI.
 
-**Recommendation:** Either remove `reviewer.py` or document its purpose if it's intentionally retained.
+**Resolution:** Removed `src/reviewer.py` as it was unused legacy code.
 
 ### Medium Priority
 
-#### 3. Inconsistent Default Values for `max_revisions`
+#### 3. ~~Inconsistent Default Values for `max_revisions`~~ ✅ RESOLVED
 **Location:** `src/orchestrator.py:38` vs `CLAUDE.md`
 
 The orchestrator defaults to `max_revisions=7`, but CLAUDE.md documents the default as `2`.
@@ -81,9 +81,9 @@ max_revisions: int = 7,
 # "Repeats until all pass or max_revisions (default: 2) is reached"
 ```
 
-**Recommendation:** Align documentation with code or vice versa.
+**Resolution:** Updated CLAUDE.md to document the actual default of 7.
 
-#### 4. Magic Numbers Without Constants
+#### 4. ~~Magic Numbers Without Constants~~ ✅ RESOLVED
 **Location:** Various files
 
 Several magic numbers could be extracted to named constants for clarity:
@@ -93,9 +93,13 @@ Several magic numbers could be extracted to named constants for clarity:
 - `src/persistence.py:269` - `100` character threshold
 - `src/reviewers/abstract_reviewer.py:107` - `200` character limit for location
 
-**Recommendation:** Define constants at module level with descriptive names.
+**Resolution:** Added named constants:
+- `VOICE_CONTINUITY_WORDS`, `SUMMARY_CONTENT_LIMIT` in chapter.py
+- `MAX_AVOID_NAMES`, `MAX_AVOID_TITLES`, `MAX_AVOID_LOGLINES` in concept.py
+- `MIN_CHAPTER_CONTENT_LENGTH` in persistence.py
+- `MAX_ISSUE_LOCATION_LENGTH` in abstract_reviewer.py
 
-#### 5. Inconsistent Error Handling Patterns
+#### 5. ~~Inconsistent Error Handling Patterns~~ ✅ RESOLVED
 **Location:** `src/persistence.py:145`, `src/gemini_client.py:88`
 
 Some methods use bare `except Exception` which can mask errors:
@@ -106,7 +110,7 @@ except Exception:
     pass  # Silently ignores any error
 ```
 
-**Recommendation:** Log errors or catch specific exceptions.
+**Resolution:** Changed to catch specific exceptions (`json.JSONDecodeError`, `ValueError`, `KeyError`) with a comment explaining the intent.
 
 ### Low Priority
 
